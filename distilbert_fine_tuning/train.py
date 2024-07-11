@@ -61,7 +61,6 @@ with mlflow.start_run():
         headline classification""",
     )
     mlflow.log_metric("initial_accuracy", sarcasm_probability)
-    mlflow_logger = MLFlowLogger()
 
     # Set up the trainer
     trainer = Trainer(
@@ -69,7 +68,6 @@ with mlflow.start_run():
         train_dataloader=train_loader,
         eval_dataloader=val_loader,
         max_duration="1ep",
-        loggers=[mlflow_logger]
     )
 
     # Train the model
