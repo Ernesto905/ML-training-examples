@@ -1,7 +1,7 @@
 # MosaicML imports
 from composer import Trainer
 from composer.models import HuggingFaceModel
-from composer.callbacks import MLFlowLogger
+from composer.loggers import MLFlowLogger
 
 import mlflow
 import torch
@@ -69,7 +69,7 @@ with mlflow.start_run():
         train_dataloader=train_loader,
         eval_dataloader=val_loader,
         max_duration="1ep",
-        callbacks=[mlflow_logger],
+        loggers=[mlflow_logger]
     )
 
     # Train the model
