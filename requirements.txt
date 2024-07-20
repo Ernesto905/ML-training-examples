@@ -1,4 +1,7 @@
 torch
+torchvision
+matplotlib
 mosaicml[all]
 mlflow==2.13.2
 sagemaker-mlflow==0.1.0
+notebook
