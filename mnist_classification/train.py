@@ -56,7 +56,7 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     # Use sagemaker env var to find our data in
     # /opt/ml/input/data/training/data
-    # sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
+    sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
     # mnist_data_path = os.path.join(sagemaker_data_root_path, "data")
     
     root_path = Path(sagemaker_data_root_path)
