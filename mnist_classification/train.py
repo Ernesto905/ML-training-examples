@@ -61,8 +61,7 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     
     root_path = Path(sagemaker_data_root_path)
     
-    mnist_data_path = root_path / 'data'
-
+    mnist_data_path = root_path 
 
     # Print the contents of the training directory (Useful for debugging)
     print(f"!!! Contents of training directory ({mnist_data_path}):")
