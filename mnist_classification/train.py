@@ -1,3 +1,4 @@
+from pathlib import Path
 import torchvision
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
@@ -55,8 +56,13 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     # Use sagemaker env var to find our data in
     # /opt/ml/input/data/training/data
-    sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
-    mnist_data_path = os.path.join(sagemaker_data_root_path, "data")
+    # sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
+    # mnist_data_path = os.path.join(sagemaker_data_root_path, "data")
+    
+    root_path = Path(sagemaker_data_root_path)
+    
+    mnist_data_path = root_path / 'data'
+
 
     # Print the contents of the training directory (Useful for debugging)
     print(f"!!! Contents of training directory ({mnist_data_path}):")
@@ -64,33 +70,33 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
         print(f"  {item}")
 
     # Use the MNIST subdirectory as the root
-    mnist_root = os.path.join(mnist_data_path, "MNIST")
-    print("using mnist as root!")
-
-    print(f"!!! Contents of MNIST directory ({mnist_root}):")
-    for item in os.listdir(mnist_root):
-        print(f"  {item}")
+    # mnist_root = os.path.join(mnist_data_path, "MNIST")
+    # print("using mnist as root!")
+    #
+    # print(f"!!! Contents of MNIST directory ({mnist_root}):")
+    # for item in os.listdir(mnist_root):
+    #     print(f"  {item}")
 
     try:
-        # Debugging
-        expected_files = [
-            "train-images-idx3-ubyte",
-            "train-labels-idx1-ubyte",
-            "t10k-images-idx3-ubyte",
-            "t10k-labels-idx1-ubyte",
-        ]
-        for file in expected_files:
-            file_path = os.path.join(mnist_root, "raw", file)
-            if os.path.exists(file_path):
-                print(f"File exists: {file_path}")
-            else:
-                print(f"File missing: {file_path}")
+        # # Debugging
+        # expected_files = [
+        #     "train-images-idx3-ubyte",
+        #     "train-labels-idx1-ubyte",
+        #     "t10k-images-idx3-ubyte",
+        #     "t10k-labels-idx1-ubyte",
+        # ]
+        # for file in expected_files:
+        #     file_path = os.path.join(mnist_root, "raw", file)
+        #     if os.path.exists(file_path):
+        #         print(f"File exists: {file_path}")
+        #     else:
+        #         print(f"File missing: {file_path}")
 
         training_data = torchvision.datasets.MNIST(
-            root=mnist_root, transform=ToTensor(), train=True, download=False
+            root=mnist_data_path, transform=ToTensor(), train=True, download=False
         )
         testing_data = torchvision.datasets.MNIST(
-            root=mnist_root, transform=ToTensor(), train=False, download=False
+            root=mnist_data_path, transform=ToTensor(), train=False, download=False
         )
 
         train_dataloader = DataLoader(
