@@ -50,8 +50,9 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
         Tuple[DataLoader, DataLoader]: Train and test dataloaders
     """
 
-    # Get the path to the training data from the environment variable
-    training_path = os.environ['SM_CHANNEL_TRAINING']
+    # Get the path to the training data from the environment variable and
+    # append /data (since that's what MNIST looks for)
+    training_path = os.environ.get('SM_CHANNEL_TRAINING', 'data')
 
     # Print the contents of the training directory (Useful for debugging)
     print(f"!!! Contents of training directory ({training_path}):")
@@ -59,10 +60,10 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
         print(f"  {item}")
 
     try:
-        training_data = torchvision.datasets.MNIST(root="data",
+        training_data = torchvision.datasets.MNIST(root=training_path,
                                                    transform=ToTensor(),
                                                    train=True, download=False)
-        testing_data = torchvision.datasets.MNIST(root="data",
+        testing_data = torchvision.datasets.MNIST(root=training_path,
                                                   transform=ToTensor(),
                                                   train=False, download=False)
 
