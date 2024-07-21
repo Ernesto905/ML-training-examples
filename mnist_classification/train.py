@@ -50,20 +50,21 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
         Tuple[DataLoader, DataLoader]: Train and test dataloaders
     """
 
-    # Get the path to the training data from the environment variable and
-    # append /data (since that's what MNIST looks for)
-    training_path = os.environ.get('SM_CHANNEL_TRAINING', 'data')
+    # Use sagemaker env var to find our data in
+    # /opt/ml/input/data/training/data
+    sagemaker_data_root_path = os.environ.get('SM_CHANNEL_TRAINING')
+    mnist_data_path = os.path.join(sagemaker_data_root_path, 'data')
 
     # Print the contents of the training directory (Useful for debugging)
-    print(f"!!! Contents of training directory ({training_path}):")
-    for item in os.listdir(training_path):
+    print(f"!!! Contents of training directory ({mnist_data_path}):")
+    for item in os.listdir(mnist_data_path):
         print(f"  {item}")
 
     try:
-        training_data = torchvision.datasets.MNIST(root=training_path,
+        training_data = torchvision.datasets.MNIST(root=mnist_data_path,
                                                    transform=ToTensor(),
                                                    train=True, download=False)
-        testing_data = torchvision.datasets.MNIST(root=training_path,
+        testing_data = torchvision.datasets.MNIST(root=mnist_data_path,
                                                   transform=ToTensor(),
                                                   train=False, download=False)
 
