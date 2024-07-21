@@ -6,6 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from typing import Tuple
+import os
 
 class Net(nn.Module):
     """
@@ -41,18 +42,29 @@ class Net(nn.Module):
 
 def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     """
-    Create and return train and test dataloaders for MNIST dataset.
+    Create and return train and test dataloaders for MNIST dataset. Note this
+    assume the script is run on a sagemaker instance with the necesary
+    dependencies installed
 
     Returns:
         Tuple[DataLoader, DataLoader]: Train and test dataloaders
     """
+
+    # Get the path to the training data from the environment variable
+    training_path = os.environ['SM_CHANNEL_TRAINING']
+
+    # Print the contents of the training directory (Useful for debugging)
+    print(f"!!! Contents of training directory ({training_path}):")
+    for item in os.listdir(training_path):
+        print(f"  {item}")
+
     try:
         training_data = torchvision.datasets.MNIST(root="data",
                                                    transform=ToTensor(),
-                                                   train=True, download=True)
+                                                   train=True, download=False)
         testing_data = torchvision.datasets.MNIST(root="data",
                                                   transform=ToTensor(),
-                                                  train=False, download=True)
+                                                  train=False, download=False)
 
         train_dataloader = DataLoader(training_data, batch_size=100, shuffle=True, num_workers=1)
         test_dataloader = DataLoader(testing_data, batch_size=64, shuffle=True, num_workers=1)
