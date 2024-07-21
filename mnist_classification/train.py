@@ -1,26 +1,28 @@
-import torchvision 
+import torchvision
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
 import torch
-import torch.nn as nn 
+import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from typing import Tuple
 import os
 
+
 class Net(nn.Module):
     """
     A simple convolutional neural network for MNIST classification.
     """
+
     def __init__(self):
         super(Net, self).__init__()
-        
+
         self.conv1 = nn.Conv2d(1, 10, kernel_size=5)
         self.conv2 = nn.Conv2d(10, 20, kernel_size=5)
         self.conv2_drop = nn.Dropout2d()
         self.fc1 = nn.Linear(320, 50)
         self.fc2 = nn.Linear(50, 10)
-    
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the network.
@@ -37,8 +39,9 @@ class Net(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
-        
+
         return x
+
 
 def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     """
@@ -52,31 +55,64 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     # Use sagemaker env var to find our data in
     # /opt/ml/input/data/training/data
-    sagemaker_data_root_path = os.environ.get('SM_CHANNEL_TRAINING')
-    mnist_data_path = os.path.join(sagemaker_data_root_path, 'data')
+    sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
+    mnist_data_path = os.path.join(sagemaker_data_root_path, "data")
 
     # Print the contents of the training directory (Useful for debugging)
     print(f"!!! Contents of training directory ({mnist_data_path}):")
     for item in os.listdir(mnist_data_path):
         print(f"  {item}")
 
-    try:
-        training_data = torchvision.datasets.MNIST(root=mnist_data_path,
-                                                   transform=ToTensor(),
-                                                   train=True, download=False)
-        testing_data = torchvision.datasets.MNIST(root=mnist_data_path,
-                                                  transform=ToTensor(),
-                                                  train=False, download=False)
+    # Use the MNIST subdirectory as the root
+    mnist_root = os.path.join(mnist_data_path, "MNIST")
+    print("using mnist as root!")
 
-        train_dataloader = DataLoader(training_data, batch_size=100, shuffle=True, num_workers=1)
-        test_dataloader = DataLoader(testing_data, batch_size=64, shuffle=True, num_workers=1)
+    print(f"!!! Contents of MNIST directory ({mnist_root}):")
+    for item in os.listdir(mnist_root):
+        print(f"  {item}")
+
+    try:
+        # Debugging
+        expected_files = [
+            "train-images-idx3-ubyte",
+            "train-labels-idx1-ubyte",
+            "t10k-images-idx3-ubyte",
+            "t10k-labels-idx1-ubyte",
+        ]
+        for file in expected_files:
+            file_path = os.path.join(mnist_root, "raw", file)
+            if os.path.exists(file_path):
+                print(f"File exists: {file_path}")
+            else:
+                print(f"File missing: {file_path}")
+
+        training_data = torchvision.datasets.MNIST(
+            root=mnist_root, transform=ToTensor(), train=True, download=False
+        )
+        testing_data = torchvision.datasets.MNIST(
+            root=mnist_root, transform=ToTensor(), train=False, download=False
+        )
+
+        train_dataloader = DataLoader(
+            training_data, batch_size=100, shuffle=True, num_workers=1
+        )
+        test_dataloader = DataLoader(
+            testing_data, batch_size=64, shuffle=True, num_workers=1
+        )
 
         return train_dataloader, test_dataloader
     except Exception as e:
         raise RuntimeError(f"Error creating dataloaders: {str(e)}")
 
-def train(model: nn.Module, train_dataloader: DataLoader, loss_fn: nn.Module, 
-          optimizer: optim.Optimizer, device: torch.device, epoch: int) -> None:
+
+def train(
+    model: nn.Module,
+    train_dataloader: DataLoader,
+    loss_fn: nn.Module,
+    optimizer: optim.Optimizer,
+    device: torch.device,
+    epoch: int,
+) -> None:
     """
     Train the model for one epoch.
 
@@ -94,16 +130,24 @@ def train(model: nn.Module, train_dataloader: DataLoader, loss_fn: nn.Module,
         try:
             data, target = data.to(device), target.to(device)
             optimizer.zero_grad()
-            output = model(data) 
+            output = model(data)
             loss = loss_fn(output, target)
             loss.backward()
             optimizer.step()
             if batch_idx % 20 == 0:
-                print(f"Train epoch: {epoch} [{batch_idx * len(data)} / {len(train_dataloader.dataset)} ({100. * batch_idx / len(train_dataloader):.0f}%)]\t{loss.item():.6f}")
+                print(
+                    f"Train epoch: {epoch} [{batch_idx * len(data)} / {len(train_dataloader.dataset)} ({100. * batch_idx / len(train_dataloader):.0f}%)]\t{loss.item():.6f}"
+                )
         except Exception as e:
             print(f"Error in training batch {batch_idx}: {str(e)}")
 
-def test(model: nn.Module, test_dataloader: DataLoader, device: torch.device, loss_fn: nn.Module) -> None:
+
+def test(
+    model: nn.Module,
+    test_dataloader: DataLoader,
+    device: torch.device,
+    loss_fn: nn.Module,
+) -> None:
     """
     Test the model on the test dataset.
 
@@ -115,8 +159,8 @@ def test(model: nn.Module, test_dataloader: DataLoader, device: torch.device, lo
     """
     model.eval()
 
-    test_loss = 0 
-    correct = 0 
+    test_loss = 0
+    correct = 0
 
     try:
         with torch.no_grad():
@@ -129,9 +173,12 @@ def test(model: nn.Module, test_dataloader: DataLoader, device: torch.device, lo
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
         test_loss /= len(test_dataloader.dataset)
-        print(f"\nTest set: Average loss: {test_loss:.4f}, Accuracy {correct}/{len(test_dataloader.dataset)} ({100 * correct / len(test_dataloader.dataset):.0f}%\n")
+        print(
+            f"\nTest set: Average loss: {test_loss:.4f}, Accuracy {correct}/{len(test_dataloader.dataset)} ({100 * correct / len(test_dataloader.dataset):.0f}%\n"
+        )
     except Exception as e:
         print(f"Error in testing: {str(e)}")
+
 
 def main() -> None:
     """
@@ -140,7 +187,7 @@ def main() -> None:
     try:
         train_dataloader, test_dataloader = train_test_dataloaders()
 
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using: {device}")
 
         model = Net().to(device)
@@ -153,6 +200,7 @@ def main() -> None:
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
+
 
 if __name__ == "__main__":
     main()
