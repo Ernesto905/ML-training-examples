@@ -91,7 +91,7 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     for x in pathlib_path_object.iterdir():
         if x.is_dir():
-            print("Dir:", x)
+            print("Di r:", x)
 
     print("AS AN ASIDE, currently in", Path.cwd())
     print("Checking files...")
@@ -103,6 +103,14 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
         )
         testing_data = torchvision.datasets.MNIST(
             root=pathlib_path_object, transform=ToTensor(), train=False, download=False
+        )
+
+        # Trying this out just in case
+        training_data = torchvision.datasets.MNIST(
+            root='/opt/ml/input/data/training', transform=ToTensor(), train=True, download=False
+        )
+        testing_data = torchvision.datasets.MNIST(
+            root='/opt/ml/input/data/training', transform=ToTensor(), train=False, download=False
         )
 
         train_dataloader = DataLoader(
