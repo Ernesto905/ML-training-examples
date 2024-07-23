@@ -1,4 +1,3 @@
-from logging import root
 from pathlib import Path
 import torchvision
 from torchvision.transforms import ToTensor
@@ -9,6 +8,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from typing import Tuple
 import os
+import mlflow
+
+mlflow.set_tracking_uri(os.environ.get("TRACKING_ARN"))
+mlflow.set_experiment("MNIST Experiment")
 
 
 class Net(nn.Module):
@@ -45,7 +48,27 @@ class Net(nn.Module):
         return x
 
 
-def check_mnist_files(root_dir):
+
+def check_mnist_files(root_dir: Path) -> bool:
+    """
+    Check for the presence of MNIST dataset files in the specified directory.
+
+    This function verifies if all the required MNIST dataset files are present
+    in the expected directory structure. It checks for the following files:
+    - train-images-idx3-ubyte
+    - train-labels-idx1-ubyte
+    - t10k-images-idx3-ubyte
+    - t10k-labels-idx1-ubyte
+
+    Args:
+        root_dir (Path): The root directory where the MNIST dataset is expected to be located.
+
+    Returns:
+        bool: True if all expected files are present, False otherwise.
+
+    Prints:
+        Status messages indicating which files were found or are missing.
+    """
     expected_files = [
         "train-images-idx3-ubyte",
         "train-labels-idx1-ubyte",
@@ -53,18 +76,18 @@ def check_mnist_files(root_dir):
         "t10k-labels-idx1-ubyte",
     ]
 
-    mnist_dir = os.path.join(root_dir, "MNIST", "raw")
+    mnist_dir = root_dir / "MNIST" / "raw"
 
     print(f"Checking for MNIST files in: {mnist_dir}")
 
-    if not os.path.exists(mnist_dir):
+    if not mnist_dir.exists():
         print(f"Directory does not exist: {mnist_dir}")
         return False
 
     all_files_present = True
     for file in expected_files:
-        file_path = os.path.join(mnist_dir, file)
-        if os.path.exists(file_path):
+        file_path = mnist_dir / file
+        if file_path.exists():
             print(f"Found: {file}")
         else:
             print(f"Missing: {file}")
@@ -143,6 +166,11 @@ def train(
                 print(
                     f"Train epoch: {epoch} [{batch_idx * len(data)} / {len(train_dataloader.dataset)} ({100. * batch_idx / len(train_dataloader):.0f}%)]\t{loss.item():.6f}"
                 )
+                mlflow.log_metric(
+                    "train_loss",
+                    loss.item(),
+                    step=epoch * len(train_dataloader) + batch_idx,
+                )
         except Exception as e:
             print(f"Error in training batch {batch_idx}: {str(e)}")
 
@@ -152,6 +180,7 @@ def test(
     test_dataloader: DataLoader,
     device: torch.device,
     loss_fn: nn.Module,
+    epoch: int,
 ) -> None:
     """
     Test the model on the test dataset.
@@ -178,8 +207,14 @@ def test(
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
         test_loss /= len(test_dataloader.dataset)
+
         print(
             f"\nTest set: Average loss: {test_loss:.4f}, Accuracy {correct}/{len(test_dataloader.dataset)} ({100 * correct / len(test_dataloader.dataset):.0f}%\n"
+        )
+
+        mlflow.log_metric("test_loss", test_loss, step=epoch)
+        mlflow.log_metric(
+            "test_accuracy", 100.0 * correct / len(test_dataloader.dataset), step=epoch
         )
     except Exception as e:
         print(f"Error in testing: {str(e)}")
@@ -190,18 +225,42 @@ def main() -> None:
     Main function to run the training and testing process.
     """
     try:
-        train_dataloader, test_dataloader = train_test_dataloaders()
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        print(f"Using: {device}")
+        # Also available
+        # mlflow.pytorch.autolog()
 
-        model = Net().to(device)
-        optimizer = optim.Adam(model.parameters(), lr=0.001)
-        loss_fn = nn.CrossEntropyLoss()
+        with mlflow.start_run():
+            train_dataloader, test_dataloader = train_test_dataloaders()
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        for epoch in range(1, 11):
-            train(model, train_dataloader, loss_fn, optimizer, device, epoch)
-            test(model, test_dataloader, device, loss_fn)
+            # Hyperparams
+            lr = 0.001
+            batch_size = 100
+            epochs = 10
+
+            # MLFLOW tracking
+            mlflow.log_param("device", device)
+            mlflow.log_param("model_name", "MNIST CNN")
+            mlflow.log_param("learning_rate", lr)
+            mlflow.log_param("batch_size", batch_size)
+            mlflow.log_param("epochs", epochs)
+
+            model = Net().to(device)
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+            loss_fn = nn.CrossEntropyLoss()
+
+            for epoch in range(epochs):
+                train(model, train_dataloader, loss_fn, optimizer, device, epoch)
+                test(model, test_dataloader, device, loss_fn, epoch)
+
+            # log model
+            mlflow.pytorch.log_model(model, "mnist_cnn")
+            mlflow.set_tag(
+                "Training Info",
+                """Convolutional neural network in
+                           PyTorch""",
+            )
+            mlflow.set_tag("Dataset used", "MNIST")
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
