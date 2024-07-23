@@ -85,32 +85,15 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     # Use sagemaker env var to find our data in
     sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
-    pathlib_path_object = Path(sagemaker_data_root_path)
+    data_path = Path(sagemaker_data_root_path)
 
-    print("Listing subdirectories:")
-
-    for x in pathlib_path_object.iterdir():
-        if x.is_dir():
-            print("Di r:", x)
-
-    print("AS AN ASIDE, currently in", Path.cwd())
-    print("Checking files...")
-    print("Found all files: ", check_mnist_files(pathlib_path_object))
     try:
 
         training_data = torchvision.datasets.MNIST(
-            root=pathlib_path_object, transform=ToTensor(), train=True, download=False
+            root=data_path, transform=ToTensor(), train=True, download=False
         )
         testing_data = torchvision.datasets.MNIST(
-            root=pathlib_path_object, transform=ToTensor(), train=False, download=False
-        )
-
-        # Trying this out just in case
-        training_data = torchvision.datasets.MNIST(
-            root='/opt/ml/input/data/training', transform=ToTensor(), train=True, download=False
-        )
-        testing_data = torchvision.datasets.MNIST(
-            root='/opt/ml/input/data/training', transform=ToTensor(), train=False, download=False
+            root=data_path, transform=ToTensor(), train=False, download=False
         )
 
         train_dataloader = DataLoader(
