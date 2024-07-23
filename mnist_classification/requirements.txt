@@ -1,3 +1,2 @@
-mlflow==1.23.1
-# sagemaker-training
-# sagemaker-mlflow==0.1.0
+mlflow
+sagemaker-mlflow
