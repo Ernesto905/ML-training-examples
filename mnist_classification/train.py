@@ -48,7 +48,26 @@ class Net(nn.Module):
         return x
 
 
-def check_mnist_files(root_dir):
+def check_mnist_files(root_dir: Path) -> bool:
+    """
+    Check for the presence of MNIST dataset files in the specified directory.
+
+    This function verifies if all the required MNIST dataset files are present
+    in the expected directory structure. It checks for the following files:
+    - train-images-idx3-ubyte
+    - train-labels-idx1-ubyte
+    - t10k-images-idx3-ubyte
+    - t10k-labels-idx1-ubyte
+
+    Args:
+        root_dir (Path): The root directory where the MNIST dataset is expected to be located.
+
+    Returns:
+        bool: True if all expected files are present, False otherwise.
+
+    Prints:
+        Status messages indicating which files were found or are missing.
+    """
     expected_files = [
         "train-images-idx3-ubyte",
         "train-labels-idx1-ubyte",
@@ -56,18 +75,18 @@ def check_mnist_files(root_dir):
         "t10k-labels-idx1-ubyte",
     ]
 
-    mnist_dir = os.path.join(root_dir, "MNIST", "raw")
+    mnist_dir = root_dir / "MNIST" / "raw"
 
     print(f"Checking for MNIST files in: {mnist_dir}")
 
-    if not os.path.exists(mnist_dir):
+    if not mnist_dir.exists():
         print(f"Directory does not exist: {mnist_dir}")
         return False
 
     all_files_present = True
     for file in expected_files:
-        file_path = os.path.join(mnist_dir, file)
-        if os.path.exists(file_path):
+        file_path = mnist_dir / file
+        if file_path.exists():
             print(f"Found: {file}")
         else:
             print(f"Missing: {file}")
