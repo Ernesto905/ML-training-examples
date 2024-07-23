@@ -48,6 +48,7 @@ class Net(nn.Module):
         return x
 
 
+
 def check_mnist_files(root_dir: Path) -> bool:
     """
     Check for the presence of MNIST dataset files in the specified directory.
