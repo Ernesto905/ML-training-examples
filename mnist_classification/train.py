@@ -218,11 +218,11 @@ def main() -> None:
             epochs = 10
 
             # MLFLOW tracking
-            mlflow.log("device", device)
-            mlflow.log("model_name", "MNIST CNN")
-            mlflow.log("learning_rate", lr)
-            mlflow.log("batch_size", batch_size)
-            mlflow.log("epochs", epochs)
+            mlflow.log_params("device", device)
+            mlflow.log_params("model_name", "MNIST CNN")
+            mlflow.log_params("learning_rate", lr)
+            mlflow.log_params("batch_size", batch_size)
+            mlflow.log_params("epochs", epochs)
 
             model = Net().to(device)
             optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -234,8 +234,12 @@ def main() -> None:
 
             # log model
             mlflow.pytorch.log_model(model, "mnist_cnn")
-            mlflow.set_tag("model_type", "CNN")
-            mlflow.set_tag("dataset", "MNIST")
+            mlflow.set_tag(
+                "Training Info",
+                """Convolutional neural network in
+                           PyTorch""",
+            )
+            mlflow.set_tag("Dataset used", "MNIST")
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
