@@ -218,7 +218,7 @@ def main() -> None:
             epochs = 10
 
             # MLFLOW tracking
-            mflow.log("device", device)
+            mlflow.log("device", device)
             mlflow.log("model_name", "MNIST CNN")
             mlflow.log("learning_rate", lr)
             mlflow.log("batch_size", batch_size)
