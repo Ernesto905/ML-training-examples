@@ -87,6 +87,8 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
     data_path = Path(sagemaker_data_root_path)
 
+    print(f"MNIST found: {check_mnist_files(data_path)}")
+
     try:
 
         training_data = torchvision.datasets.MNIST(
