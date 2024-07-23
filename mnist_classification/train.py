@@ -143,14 +143,17 @@ def train(
             loss.backward()
             optimizer.step()
             if batch_idx % 20 == 0:
+                print("Currently here1")
                 print(
                     f"Train epoch: {epoch} [{batch_idx * len(data)} / {len(train_dataloader.dataset)} ({100. * batch_idx / len(train_dataloader):.0f}%)]\t{loss.item():.6f}"
                 )
+                print("Currently here2")
                 mlflow.log_metric(
                     "train_loss",
                     loss.item(),
                     step=epoch * len(train_dataloader) + batch_idx,
                 )
+                print("Currently here3")
         except Exception as e:
             print(f"Error in training batch {batch_idx}: {str(e)}")
 
@@ -187,14 +190,20 @@ def test(
                 correct += pred.eq(target.view_as(pred)).sum().item()
 
         test_loss /= len(test_dataloader.dataset)
+
+        print("Currently here4")
         print(
             f"\nTest set: Average loss: {test_loss:.4f}, Accuracy {correct}/{len(test_dataloader.dataset)} ({100 * correct / len(test_dataloader.dataset):.0f}%\n"
         )
+
+        print("Currently here5")
 
         mlflow.log_metric("test_loss", test_loss, step=epoch)
         mlflow.log_metric(
             "test_accuracy", 100.0 * correct / len(test_dataloader.dataset), step=epoch
         )
+
+        print("Currently here6")
     except Exception as e:
         print(f"Error in testing: {str(e)}")
 
@@ -218,11 +227,11 @@ def main() -> None:
             epochs = 10
 
             # MLFLOW tracking
-            mlflow.log_params("device", device)
-            mlflow.log_params("model_name", "MNIST CNN")
-            mlflow.log_params("learning_rate", lr)
-            mlflow.log_params("batch_size", batch_size)
-            mlflow.log_params("epochs", epochs)
+            mlflow.log_param("device", device)
+            mlflow.log_param("model_name", "MNIST CNN")
+            mlflow.log_param("learning_rate", lr)
+            mlflow.log_param("batch_size", batch_size)
+            mlflow.log_param("epochs", epochs)
 
             model = Net().to(device)
             optimizer = optim.Adam(model.parameters(), lr=lr)
