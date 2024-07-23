@@ -57,7 +57,7 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     # Use sagemaker env var to find our data in
     sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
-    pathlib_path_object = Path(sagemaker_data_root_path) / "data"
+    pathlib_path_object = Path(sagemaker_data_root_path) 
     root_path = str(pathlib_path_object)
     print("Attempt with the following path: ", root_path)
 
@@ -65,7 +65,6 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     for x in pathlib_path_object.iterdir():
         if x.is_dir():
             print("Dir:", x)
-
     try:
 
         training_data = torchvision.datasets.MNIST(
