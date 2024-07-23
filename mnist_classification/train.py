@@ -48,6 +48,34 @@ class Net(nn.Module):
         return x
 
 
+def check_mnist_files(root_dir):
+    expected_files = [
+        "train-images-idx3-ubyte",
+        "train-labels-idx1-ubyte",
+        "t10k-images-idx3-ubyte",
+        "t10k-labels-idx1-ubyte",
+    ]
+
+    mnist_dir = os.path.join(root_dir, "MNIST", "raw")
+
+    print(f"Checking for MNIST files in: {mnist_dir}")
+
+    if not os.path.exists(mnist_dir):
+        print(f"Directory does not exist: {mnist_dir}")
+        return False
+
+    all_files_present = True
+    for file in expected_files:
+        file_path = os.path.join(mnist_dir, file)
+        if os.path.exists(file_path):
+            print(f"Found: {file}")
+        else:
+            print(f"Missing: {file}")
+            all_files_present = False
+
+    return all_files_present
+
+
 def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     """
     Create and return train and test dataloaders for MNIST dataset. Note this
@@ -59,9 +87,10 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     """
 
     # Use sagemaker env var to find our data in
-    # /opt/ml/input/data/training/data
     sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
     data_path = Path(sagemaker_data_root_path)
+
+    print(f"MNIST found: {check_mnist_files(data_path)}")
 
     try:
 
@@ -202,7 +231,7 @@ def main() -> None:
             for epoch in range(epochs):
                 train(model, train_dataloader, loss_fn, optimizer, device, epoch)
                 test(model, test_dataloader, device, loss_fn, epoch)
-            
+
             # log model
             mlflow.pytorch.log_model(model, "mnist_cnn")
             mlflow.set_tag("model_type", "CNN")
