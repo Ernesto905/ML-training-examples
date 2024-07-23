@@ -1,7 +1,4 @@
-<<<<<<< Updated upstream
-=======
 from pathlib import Path
->>>>>>> Stashed changes
 import torchvision
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
