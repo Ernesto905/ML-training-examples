@@ -47,20 +47,20 @@ class Net(nn.Module):
 
 def check_mnist_files(root_dir):
     expected_files = [
-        'train-images-idx3-ubyte',
-        'train-labels-idx1-ubyte',
-        't10k-images-idx3-ubyte',
-        't10k-labels-idx1-ubyte'
+        "train-images-idx3-ubyte",
+        "train-labels-idx1-ubyte",
+        "t10k-images-idx3-ubyte",
+        "t10k-labels-idx1-ubyte",
     ]
-    
-    mnist_dir = os.path.join(root_dir, 'MNIST', 'raw')
-    
+
+    mnist_dir = os.path.join(root_dir, "MNIST", "raw")
+
     print(f"Checking for MNIST files in: {mnist_dir}")
-    
+
     if not os.path.exists(mnist_dir):
         print(f"Directory does not exist: {mnist_dir}")
         return False
-    
+
     all_files_present = True
     for file in expected_files:
         file_path = os.path.join(mnist_dir, file)
@@ -69,7 +69,7 @@ def check_mnist_files(root_dir):
         else:
             print(f"Missing: {file}")
             all_files_present = False
-    
+
     return all_files_present
 
 
@@ -85,28 +85,24 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     # Use sagemaker env var to find our data in
     sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
-    pathlib_path_object = Path(sagemaker_data_root_path) 
-    root_path = str(pathlib_path_object)
-    print("Attempt with the following path: ", root_path)
+    pathlib_path_object = Path(sagemaker_data_root_path)
 
     print("Listing subdirectories:")
+
     for x in pathlib_path_object.iterdir():
         if x.is_dir():
             print("Dir:", x)
 
-    print("AS AN ASIDE, currently in", Path.cwd)
-    # root_path = Path.cwd() / "data" / "datum"
-
+    print("AS AN ASIDE, currently in", Path.cwd())
     print("Checking files...")
-
-    print("Found all files: ", check_mnist_files(root_path))    
+    print("Found all files: ", check_mnist_files(pathlib_path_object))
     try:
 
         training_data = torchvision.datasets.MNIST(
-            root=root_path, transform=ToTensor(), train=True, download=False
+            root=pathlib_path_object, transform=ToTensor(), train=True, download=False
         )
         testing_data = torchvision.datasets.MNIST(
-            root=root_path, transform=ToTensor(), train=False, download=False
+            root=pathlib_path_object, transform=ToTensor(), train=False, download=False
         )
 
         train_dataloader = DataLoader(
