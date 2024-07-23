@@ -57,9 +57,14 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
 
     # Use sagemaker env var to find our data in
     sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
-
-    root_path = str(sagemaker_data_root_path)
+    pathlib_path_object = Path(sagemaker_data_root_path) / "data"
+    root_path = str(pathlib_path_object)
     print("Attempt with the following path: ", root_path)
+
+    print("Listing subdirectories:")
+    for x in pathlib_path_object.iterdir():
+        if x.is_dir():
+            print("Dir:", x)
 
     try:
 
