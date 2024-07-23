@@ -45,6 +45,34 @@ class Net(nn.Module):
         return x
 
 
+def check_mnist_files(root_dir):
+    expected_files = [
+        'train-images-idx3-ubyte',
+        'train-labels-idx1-ubyte',
+        't10k-images-idx3-ubyte',
+        't10k-labels-idx1-ubyte'
+    ]
+    
+    mnist_dir = os.path.join(root_dir, 'MNIST', 'raw')
+    
+    print(f"Checking for MNIST files in: {mnist_dir}")
+    
+    if not os.path.exists(mnist_dir):
+        print(f"Directory does not exist: {mnist_dir}")
+        return False
+    
+    all_files_present = True
+    for file in expected_files:
+        file_path = os.path.join(mnist_dir, file)
+        if os.path.exists(file_path):
+            print(f"Found: {file}")
+        else:
+            print(f"Missing: {file}")
+            all_files_present = False
+    
+    return all_files_present
+
+
 def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     """
     Create and return train and test dataloaders for MNIST dataset. Note this
@@ -65,6 +93,13 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
     for x in pathlib_path_object.iterdir():
         if x.is_dir():
             print("Dir:", x)
+
+    print("AS AN ASIDE, currently in", Path.cwd)
+    # root_path = Path.cwd() / "data" / "datum"
+
+    print("Checking files...")
+
+    print("Found all files: ", check_mnist_files(root_path))    
     try:
 
         training_data = torchvision.datasets.MNIST(
