@@ -2,6 +2,7 @@ from pathlib import Path
 import torchvision
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,6 +10,7 @@ import torch.optim as optim
 from typing import Tuple
 import os
 import mlflow
+
 
 import smdistributed.dataparallel.torch.distributed as dist
 from smdistributed.dataparallel.torch.parallel.distributed import (
@@ -282,7 +284,8 @@ def main() -> None:
             )
 
             device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
-            model = DDP(Net().to(device))
+            model = Net().to(device)
+            model = DDP(model)
             optimizer = optim.Adam(model.parameters(), lr=lr)
             loss_fn = nn.CrossEntropyLoss()
 
@@ -301,21 +304,21 @@ def main() -> None:
             if rank == 0:
                 torch.save(model.state_dict(), ".")
 
-            # MLFLOW tracking
-            mlflow.log_param("device", device)
-            mlflow.log_param("model_name", "MNIST CNN")
-            mlflow.log_param("learning_rate", lr)
-            mlflow.log_param("batch_size", batch_size)
-            mlflow.log_param("epochs", epochs)
+                # MLFLOW tracking
+                mlflow.log_param("device", device)
+                mlflow.log_param("model_name", "MNIST CNN")
+                mlflow.log_param("learning_rate", lr)
+                mlflow.log_param("batch_size", batch_size)
+                mlflow.log_param("epochs", epochs)
 
-            # log model
-            mlflow.pytorch.log_model(model, "mnist_cnn")
-            mlflow.set_tag(
-                "Training Info",
-                """Convolutional neural network in
-                           PyTorch""",
-            )
-            mlflow.set_tag("Dataset used", "MNIST")
+                # log model
+                mlflow.pytorch.log_model(model, "mnist_cnn")
+                mlflow.set_tag(
+                    "Training Info",
+                    """Convolutional neural network in
+                               PyTorch""",
+                )
+                mlflow.set_tag("Dataset used", "MNIST")
 
     except Exception as e:
         print(f"An error occurred: {str(e)}")
