@@ -135,6 +135,7 @@ def train_test_datasets() -> (
 def train_test_dataloaders(
     training_dataset: torchvision.datasets.MNIST,
     testing_dataset: torchvision.datasets.MNIST,
+    train_sampler
 ) -> Tuple[DataLoader, DataLoader]:
     """
     Create and return train and test dataloaders for MNIST dataset. Note this
@@ -148,7 +149,8 @@ def train_test_dataloaders(
     try:
 
         train_dataloader = DataLoader(
-            training_dataset, batch_size=100, shuffle=True, num_workers=1
+            training_dataset, batch_size=100, shuffle=True, num_workers=0,
+            sampler=train_sampler
         )
         test_dataloader = DataLoader(
             testing_dataset, batch_size=64, shuffle=True, num_workers=1
@@ -270,12 +272,13 @@ def main() -> None:
 
             # Prep dataset and data loader
             training_dataset, testing_dataset = train_test_datasets()
-            train_dataloader, test_dataloader = train_test_dataloaders(
-                training_dataset, testing_dataset
+
+            train_sampler = DistributedSampler(
+                training_dataset, num_replicas=world_size, rank=rank
             )
 
-            train_sample = DistributedSampler(
-                training_dataset, num_replicas=world_size, rank=rank
+            train_dataloader, test_dataloader = train_test_dataloaders(
+                training_dataset, testing_dataset, train_sampler
             )
 
             device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
@@ -285,10 +288,14 @@ def main() -> None:
 
             print(f"Training on {device}")
 
+            # Pin each GPU to a single distributed data parallel library process.
+            torch.cuda.set_device(local_rank)
+            model.cuda(local_rank)
 
             for epoch in range(epochs):
                 train(model, train_dataloader, loss_fn, optimizer, device, epoch)
-                test(model, test_dataloader, device, loss_fn, epoch)
+                if rank == 0:
+                    test(model, test_dataloader, device, loss_fn, epoch)
 
             # Save checkpoint only on leader node
             if rank == 0:
