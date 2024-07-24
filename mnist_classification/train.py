@@ -12,9 +12,17 @@ import os
 import mlflow
 from sagemaker_training import environment
 
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
 
-import smdistributed.dataparallel.torch.torch_smddp as dist
-from smdistributed.dataparallel.torch.torch_smddp import DistributedDataParallel as DDP
+if smdataparallel_enabled:
+    try:
+        import smdistributed.dataparallel.torch.torch_smddp
+        from smdistributed.dataparallel.torch.torch_smddp import DistributedDataParallel as DDP
+        backend = 'smddp'
+        print('Using smddp as backend')
+    except ImportError: 
+        print('smdistributed module not available, falling back to NCCL collectives.')
 
 dist.init_process_group()
 
