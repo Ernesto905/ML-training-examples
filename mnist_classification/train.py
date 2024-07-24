@@ -13,10 +13,8 @@ import mlflow
 from sagemaker_training import environment
 
 
-import smdistributed.dataparallel.torch.distributed as dist
-from smdistributed.dataparallel.torch.parallel.distributed import (
-    DistributedDataParallel as DDP,
-)
+import smdistributed.dataparallel.torch.torch_smddp as dist
+from smdistributed.dataparallel.torch.torch_smddp import DistributedDataParallel as DDP
 
 dist.init_process_group()
 
