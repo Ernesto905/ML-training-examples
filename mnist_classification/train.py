@@ -10,6 +10,7 @@ import torch.optim as optim
 from typing import Tuple
 import os
 import mlflow
+from sagemaker_training import environment
 
 
 import smdistributed.dataparallel.torch.distributed as dist
@@ -22,6 +23,7 @@ dist.init_process_group()
 mlflow.set_tracking_uri(os.environ.get("TRACKING_ARN"))
 mlflow.set_experiment("MNIST Experiment")
 
+env = environment.Environment()
 
 class Net(nn.Module):
     """
@@ -302,7 +304,8 @@ def main() -> None:
 
             # Save checkpoint only on leader node
             if rank == 0:
-                torch.save(model.state_dict(), ".")
+                model_dir = env.model_dir
+                torch.save(model.state_dict(), model_dir) 
 
                 # MLFLOW tracking
                 mlflow.log_param("device", device)
