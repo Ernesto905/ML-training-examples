@@ -10,6 +10,13 @@ from typing import Tuple
 import os
 import mlflow
 
+import smdistributed.dataparallel.torch.distributed as dist
+from smdistributed.dataparallel.torch.parallel.distributed import (
+    DistributedDataParallel as DDP,
+)
+
+dist.init_process_group()
+
 mlflow.set_tracking_uri(os.environ.get("TRACKING_ARN"))
 mlflow.set_experiment("MNIST Experiment")
 
@@ -46,7 +53,6 @@ class Net(nn.Module):
         x = self.fc2(x)
 
         return x
-
 
 
 def check_mnist_files(root_dir: Path) -> bool:
@@ -96,7 +102,40 @@ def check_mnist_files(root_dir: Path) -> bool:
     return all_files_present
 
 
-def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
+def train_test_datasets() -> (
+    Tuple[torchvision.datasets.MNIST, torchvision.datasets.MNIST]
+):
+    """
+    Create and return train and test datasets for MNIST. Will look within the
+    /opt/ml/input/ path, as obtained by the SM_CHANNEL_TRAINING environmental
+    variable
+
+    Returns:
+        Tuple[torchvision.datasets.MNIST, torchvision.datasets.MNIST]: Train
+        and test datasets
+    """
+
+    # Use sagemaker env var to find our data in
+    sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
+    data_path = Path(sagemaker_data_root_path)
+
+    print(f"MNIST found: {check_mnist_files(data_path)}")
+    try:
+        training_dataset = torchvision.datasets.MNIST(
+            root=data_path, transform=ToTensor(), train=True, download=False
+        )
+        testing_dataset = torchvision.datasets.MNIST(
+            root=data_path, transform=ToTensor(), train=False, download=False
+        )
+        return training_dataset, testing_dataset
+    except Exception as e:
+        raise RuntimeError(f"Error creating datasets: {str(e)}")
+
+
+def train_test_dataloaders(
+    training_dataset: torchvision.datasets.MNIST,
+    testing_dataset: torchvision.datasets.MNIST,
+) -> Tuple[DataLoader, DataLoader]:
     """
     Create and return train and test dataloaders for MNIST dataset. Note this
     assume the script is run on a sagemaker instance with the necesary
@@ -106,26 +145,13 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
         Tuple[DataLoader, DataLoader]: Train and test dataloaders
     """
 
-    # Use sagemaker env var to find our data in
-    sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
-    data_path = Path(sagemaker_data_root_path)
-
-    print(f"MNIST found: {check_mnist_files(data_path)}")
-
     try:
 
-        training_data = torchvision.datasets.MNIST(
-            root=data_path, transform=ToTensor(), train=True, download=False
-        )
-        testing_data = torchvision.datasets.MNIST(
-            root=data_path, transform=ToTensor(), train=False, download=False
-        )
-
         train_dataloader = DataLoader(
-            training_data, batch_size=100, shuffle=True, num_workers=1
+            training_dataset, batch_size=100, shuffle=True, num_workers=1
         )
         test_dataloader = DataLoader(
-            testing_data, batch_size=64, shuffle=True, num_workers=1
+            testing_dataset, batch_size=64, shuffle=True, num_workers=1
         )
 
         return train_dataloader, test_dataloader
@@ -225,18 +251,48 @@ def main() -> None:
     Main function to run the training and testing process.
     """
     try:
-
-        # Also available
-        # mlflow.pytorch.autolog()
-
         with mlflow.start_run():
-            train_dataloader, test_dataloader = train_test_dataloaders()
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
             # Hyperparams
             lr = 0.001
             batch_size = 100
             epochs = 10
+
+
+            # Configure DDP args
+            world_size = dist.get_world_size()
+            local_rank = dist.get_local_rank()
+            rank = dist.get_rank()
+
+            # Scale batch size by world size
+            batch_size //= dist.get_world_size() // 8
+            batch_size = max(batch_size, 1)
+
+            # Prep dataset and data loader
+            training_dataset, testing_dataset = train_test_datasets()
+            train_dataloader, test_dataloader = train_test_dataloaders(
+                training_dataset, testing_dataset
+            )
+
+            train_sample = DistributedSampler(
+                training_dataset, num_replicas=world_size, rank=rank
+            )
+
+            device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+            model = DDP(Net().to(device))
+            optimizer = optim.Adam(model.parameters(), lr=lr)
+            loss_fn = nn.CrossEntropyLoss()
+
+            print(f"Training on {device}")
+
+
+            for epoch in range(epochs):
+                train(model, train_dataloader, loss_fn, optimizer, device, epoch)
+                test(model, test_dataloader, device, loss_fn, epoch)
+
+            # Save checkpoint only on leader node
+            if rank == 0:
+                torch.save(model.state_dict(), ".")
 
             # MLFLOW tracking
             mlflow.log_param("device", device)
@@ -244,14 +300,6 @@ def main() -> None:
             mlflow.log_param("learning_rate", lr)
             mlflow.log_param("batch_size", batch_size)
             mlflow.log_param("epochs", epochs)
-
-            model = Net().to(device)
-            optimizer = optim.Adam(model.parameters(), lr=lr)
-            loss_fn = nn.CrossEntropyLoss()
-
-            for epoch in range(epochs):
-                train(model, train_dataloader, loss_fn, optimizer, device, epoch)
-                test(model, test_dataloader, device, loss_fn, epoch)
 
             # log model
             mlflow.pytorch.log_model(model, "mnist_cnn")
