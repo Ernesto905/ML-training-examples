@@ -2,7 +2,6 @@ from pathlib import Path
 import torchvision
 from torchvision.transforms import ToTensor
 from torch.utils.data import DataLoader
-from torch.utils.data.distributed import DistributedSampler
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -12,11 +11,23 @@ import os
 import mlflow
 from sagemaker_training import environment
 
-from torch.nn.parallel import DistributedDataParallel as DDP
 import torch.distributed as dist
-import smdistributed.dataparallel.torch.torch_smddp
+from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data.distributed import DistributedSampler
 
-dist.init_process_group(backend="smddp")
+
+
+# Import SMDataParallel PyTorch Modules, if applicable
+backend = 'nccl'
+training_env = environment.Environment()
+smdataparallel_enabled = training_env.additional_framework_parameters.get('sagemaker_distributed_dataparallel_enabled', False)
+if smdataparallel_enabled:
+    try:
+        import smdistributed.dataparallel.torch.torch_smddp
+        backend = 'smddp'
+        print('Using smddp as backend')
+    except ImportError: 
+        print('smdistributed module not available, falling back to NCCL collectives.')
 
 mlflow.set_tracking_uri(os.environ.get("TRACKING_ARN"))
 mlflow.set_experiment("MNIST Experiment")
@@ -255,6 +266,8 @@ def main() -> None:
     Main function to run the training and testing process.
     """
     try:
+        dist.init_process_group(backend=backend)
+
         with mlflow.start_run():
 
             # Hyperparams
