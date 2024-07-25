@@ -1,39 +1,43 @@
 import argparse
+import os
 from pathlib import Path
-import torchvision
-from torchvision.transforms import ToTensor
-from torch.utils.data import DataLoader
+from typing import Tuple
+
+import mlflow
 import torch
+import torch.distributed as dist
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from typing import Tuple
-import os
-import mlflow
-from sagemaker_training import environment
-
-import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
+from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
+import torchvision
+from torchvision.transforms import ToTensor
 
+from sagemaker_training import environment
 
 
 # Import SMDataParallel PyTorch Modules, if applicable
-backend = 'nccl'
+backend = "nccl"
 training_env = environment.Environment()
-smdataparallel_enabled = training_env.additional_framework_parameters.get('sagemaker_distributed_dataparallel_enabled', False)
+smdataparallel_enabled = training_env.additional_framework_parameters.get(
+    "sagemaker_distributed_dataparallel_enabled", False
+)
 if smdataparallel_enabled:
     try:
         import smdistributed.dataparallel.torch.torch_smddp
-        backend = 'smddp'
-        print('Using smddp as backend')
-    except ImportError: 
-        print('smdistributed module not available, falling back to NCCL collectives.')
+
+        backend = "smddp"
+        print("Using smddp as backend")
+    except ImportError:
+        print("smdistributed module not available, falling back to NCCL collectives.")
 
 mlflow.set_tracking_uri(os.environ.get("TRACKING_ARN"))
 mlflow.set_experiment("MNIST Experiment")
 
 env = environment.Environment()
+
 
 class Net(nn.Module):
     """
@@ -149,7 +153,7 @@ def train_test_datasets() -> (
 def train_test_dataloaders(
     training_dataset: torchvision.datasets.MNIST,
     testing_dataset: torchvision.datasets.MNIST,
-    train_sampler
+    train_sampler,
 ) -> Tuple[DataLoader, DataLoader]:
     """
     Create and return train and test dataloaders for MNIST dataset. Note this
@@ -163,8 +167,11 @@ def train_test_dataloaders(
     try:
 
         train_dataloader = DataLoader(
-            training_dataset, batch_size=100, shuffle=True, num_workers=0,
-            sampler=train_sampler
+            training_dataset,
+            batch_size=100,
+            shuffle=True,
+            num_workers=0,
+            sampler=train_sampler,
         )
         test_dataloader = DataLoader(
             testing_dataset, batch_size=64, shuffle=True, num_workers=1
@@ -313,7 +320,9 @@ def main() -> None:
                 training_dataset, testing_dataset, train_sampler
             )
 
-            device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+            device = torch.device(
+                f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu"
+            )
             model = Net().to(device)
             model = DDP(model)
             optimizer = optim.Adam(model.parameters(), lr=lr)
@@ -333,7 +342,7 @@ def main() -> None:
             # Save checkpoint only on leader node
             if rank == 0:
                 model_dir = env.model_dir
-                torch.save(model.state_dict(), model_dir) 
+                torch.save(model.state_dict(), model_dir)
 
                 # MLFLOW tracking
                 mlflow.log_param("device", device)
