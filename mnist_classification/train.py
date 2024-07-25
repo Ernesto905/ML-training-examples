@@ -1,3 +1,4 @@
+import argparse
 from pathlib import Path
 import torchvision
 from torchvision.transforms import ToTensor
@@ -266,8 +267,20 @@ def main() -> None:
     Main function to run the training and testing process.
     """
     try:
+
+        # Training settings
+        parser = argparse.ArgumentParser(description="MNIST Example")
+        parser.add_argument(
+            "--verbose",
+            action="store_true",
+            default=False,
+            help="For displaying smdistributed.dataparallel-specific logs",
+        )
+        print("Hello 1")
+
         dist.init_process_group(backend=backend)
 
+        print("Hello 2")
         with mlflow.start_run():
 
             # Hyperparams
@@ -275,11 +288,15 @@ def main() -> None:
             batch_size = 100
             epochs = 10
 
+            args = parser.parse_args()
 
             # Configure DDP args
             world_size = dist.get_world_size()
-            local_rank = dist.get_local_rank()
+            print("Hello 3")
             rank = dist.get_rank()
+            print("Hello 4")
+            local_rank = int(os.getenv("LOCAL_RANK", -1))
+            print("Hello 5")
 
             # Scale batch size by world size
             batch_size //= dist.get_world_size() // 8
