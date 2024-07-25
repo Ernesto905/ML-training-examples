@@ -12,12 +12,11 @@ import os
 import mlflow
 from sagemaker_training import environment
 
+from torch.nn.parallel import DistributedDataParallel as DDP
+import torch.distributed as dist
+import smdistributed.dataparallel.torch.torch_smddp
 
-
-import smdistributed.dataparallel.torch.torch_smddp as dist
-from smdistributed.dataparallel.torch.torch_smddp import DistributedDataParallel as DDP
-
-dist.init_process_group()
+dist.init_process_group(backend="smddp")
 
 mlflow.set_tracking_uri(os.environ.get("TRACKING_ARN"))
 mlflow.set_experiment("MNIST Experiment")
