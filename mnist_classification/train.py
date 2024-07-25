@@ -163,18 +163,16 @@ def train_test_dataloaders(
     Returns:
         Tuple[DataLoader, DataLoader]: Train and test dataloaders
     """
-
     try:
-
         train_dataloader = DataLoader(
             training_dataset,
             batch_size=100,
-            shuffle=True,
+            shuffle=False,  
             num_workers=0,
             sampler=train_sampler,
         )
         test_dataloader = DataLoader(
-            testing_dataset, batch_size=64, shuffle=True, num_workers=1
+            testing_dataset, batch_size=64, shuffle=False, num_workers=1
         )
 
         return train_dataloader, test_dataloader
@@ -189,6 +187,7 @@ def train(
     optimizer: optim.Optimizer,
     device: torch.device,
     epoch: int,
+    mlflow_run=None,
 ) -> None:
     """
     Train the model for one epoch.
@@ -215,11 +214,12 @@ def train(
                 print(
                     f"Train epoch: {epoch} [{batch_idx * len(data)} / {len(train_dataloader.dataset)} ({100. * batch_idx / len(train_dataloader):.0f}%)]\t{loss.item():.6f}"
                 )
-                mlflow.log_metric(
-                    "train_loss",
-                    loss.item(),
-                    step=epoch * len(train_dataloader) + batch_idx,
-                )
+                if mlflow_run:
+                    mlflow.log_metric(
+                        "train_loss",
+                        loss.item(),
+                        step=epoch * len(train_dataloader) + batch_idx,
+                    )
         except Exception as e:
             print(f"Error in training batch {batch_idx}: {str(e)}")
 
@@ -230,6 +230,7 @@ def test(
     device: torch.device,
     loss_fn: nn.Module,
     epoch: int,
+    mlflow_run=None,
 ) -> None:
     """
     Test the model on the test dataset.
@@ -260,21 +261,20 @@ def test(
         print(
             f"\nTest set: Average loss: {test_loss:.4f}, Accuracy {correct}/{len(test_dataloader.dataset)} ({100 * correct / len(test_dataloader.dataset):.0f}%\n"
         )
-
-        mlflow.log_metric("test_loss", test_loss, step=epoch)
-        mlflow.log_metric(
-            "test_accuracy", 100.0 * correct / len(test_dataloader.dataset), step=epoch
-        )
+        if mlflow_run:
+            mlflow.log_metric("test_loss", test_loss, step=epoch)
+            mlflow.log_metric(
+                "test_accuracy", 100.0 * correct / len(test_dataloader.dataset), step=epoch
+            )
     except Exception as e:
         print(f"Error in testing: {str(e)}")
 
 
-def main() -> None:
+def main(mlflow_run=None):
     """
     Main function to run the training and testing process.
     """
     try:
-
         # Training settings
         parser = argparse.ArgumentParser(description="MNIST Example")
         parser.add_argument(
@@ -283,80 +283,75 @@ def main() -> None:
             default=False,
             help="For displaying smdistributed.dataparallel-specific logs",
         )
-        print("Hello 1")
 
-        dist.init_process_group(backend=backend)
+        args = parser.parse_args()
 
-        print("Hello 2")
-        with mlflow.start_run():
+        # Configure DDP args
+        world_size = dist.get_world_size()
+        rank = dist.get_rank()
+        local_rank = dist.get_rank()
 
-            # Hyperparams
-            lr = 0.001
-            batch_size = 100
-            epochs = 10
+        # Hyperparams
+        lr = 0.001
+        batch_size = 100
+        epochs = 10
 
-            args = parser.parse_args()
+        # Scale batch size by world size
+        batch_size //= dist.get_world_size() // 8
+        batch_size = max(batch_size, 1)
 
-            # Configure DDP args
-            world_size = dist.get_world_size()
-            print("Hello 3")
-            rank = dist.get_rank()
-            print("Hello 4")
-            local_rank = int(os.getenv("LOCAL_RANK", -1))
-            print("Hello 5")
+        # If we're the main process and have an MLflow run, log parameters
+        if rank == 0 and mlflow_run:
+            mlflow.log_param("learning_rate", lr)
+            mlflow.log_param("batch_size", batch_size)
+            mlflow.log_param("epochs", epochs)
+            mlflow.log_param("world_size", world_size)
 
-            # Scale batch size by world size
-            batch_size //= dist.get_world_size() // 8
-            batch_size = max(batch_size, 1)
+        # Prep dataset and data loader
+        training_dataset, testing_dataset = train_test_datasets()
 
-            # Prep dataset and data loader
-            training_dataset, testing_dataset = train_test_datasets()
+        train_sampler = DistributedSampler(
+            training_dataset, num_replicas=world_size, rank=rank
+        )
 
-            train_sampler = DistributedSampler(
-                training_dataset, num_replicas=world_size, rank=rank
-            )
+        train_dataloader, test_dataloader = train_test_dataloaders(
+            training_dataset, testing_dataset, train_sampler
+        )
 
-            train_dataloader, test_dataloader = train_test_dataloaders(
-                training_dataset, testing_dataset, train_sampler
-            )
+        device = torch.device(f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu")
+        model = Net().to(device)
+        model = DDP(model)
+        optimizer = optim.Adam(model.parameters(), lr=lr)
+        loss_fn = nn.CrossEntropyLoss()
 
-            device = torch.device(
-                f"cuda:{local_rank}" if torch.cuda.is_available() else "cpu"
-            )
-            model = Net().to(device)
-            model = DDP(model)
-            optimizer = optim.Adam(model.parameters(), lr=lr)
-            loss_fn = nn.CrossEntropyLoss()
+        print(f"Training on {device}")
 
-            print(f"Training on {device}")
+        # Pin each GPU to a single distributed data parallel library process.
+        torch.cuda.set_device(local_rank)
+        model.cuda(local_rank)
 
-            # Pin each GPU to a single distributed data parallel library process.
-            torch.cuda.set_device(local_rank)
-            model.cuda(local_rank)
-
-            for epoch in range(epochs):
-                train(model, train_dataloader, loss_fn, optimizer, device, epoch)
-                if rank == 0:
-                    test(model, test_dataloader, device, loss_fn, epoch)
-
-            # Save checkpoint only on leader node
+        for epoch in range(epochs):
+            train_sampler.set_epoch(epoch)
+            train(model, train_dataloader, loss_fn, optimizer, device, epoch,
+                  mlflow_run)
             if rank == 0:
-                model_dir = env.model_dir
-                torch.save(model.state_dict(), model_dir)
+                test(model, test_dataloader, device, loss_fn, epoch, mlflow_run)
 
-                # MLFLOW tracking
+        # Save checkpoint only on leader node
+        if rank == 0:
+            model_dir = env.model_dir
+            torch.save(model.state_dict(), model_dir)
+
+            # MLFLOW tracking (only if we have an MLflow run)
+            if mlflow_run:
                 mlflow.log_param("device", device)
                 mlflow.log_param("model_name", "MNIST CNN")
-                mlflow.log_param("learning_rate", lr)
-                mlflow.log_param("batch_size", batch_size)
-                mlflow.log_param("epochs", epochs)
-
+                
                 # log model
                 mlflow.pytorch.log_model(model, "mnist_cnn")
                 mlflow.set_tag(
                     "Training Info",
-                    """Convolutional neural network in
-                               PyTorch""",
+                    "Convolutional neural network in PyTorch",
                 )
                 mlflow.set_tag("Dataset used", "MNIST")
 
@@ -365,4 +360,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    dist.init_process_group(backend=backend)
+    rank = dist.get_rank()
+    
+    if rank == 0:
+        with mlflow.start_run() as run:
+            main(run)
+    else:
+        main()
