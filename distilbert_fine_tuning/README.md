@@ -16,7 +16,6 @@ This training job fine-tunes a DistilBERT model on news headlines. The model is 
 ## Training
 - Entry Point: train.py
 - Hyperparameters:
-  - model_name: distilbert-base-uncased
   - max_length: 128 (for tokenization)
   - batch_size: 32
   - max_duration: 1 epoch
