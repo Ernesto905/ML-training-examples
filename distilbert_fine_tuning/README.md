@@ -1,7 +1,7 @@
 # Sarcasm Detection Training Job
 
 ## Overview
-This training job fine-tunes a DistilBERT model for sarcasm detection in news headlines. The model is trained to classify headlines as either sarcastic or not sarcastic.
+This training job fine-tunes a DistilBERT model on news headlines. The model is trained to classify headlines as either sarcastic or not sarcastic.
 
 ## Dataset
 - Source: Sarcasm_Headlines_Dataset.json (loaded from SageMaker input channel)
@@ -16,7 +16,6 @@ This training job fine-tunes a DistilBERT model for sarcasm detection in news he
 ## Training
 - Entry Point: train.py
 - Hyperparameters:
-  - model_name: distilbert-base-uncased
   - max_length: 128 (for tokenization)
   - batch_size: 32
   - max_duration: 1 epoch
