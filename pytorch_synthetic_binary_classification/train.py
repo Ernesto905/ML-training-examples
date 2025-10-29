@@ -26,7 +26,6 @@ def setup_distributed():
         return 1, 0  # world_size = 1, rank = 0 for local mode
 
 
-# Define a simple model
 class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
@@ -39,14 +38,13 @@ class Net(nn.Module):
 def generate_synthetic_data(size=100):
     X = np.random.normal(size=(size, 10)).astype(np.float32)
 
-    # Create a linear pattern: y = Xw + b, where `w` is a weight vector and b is bias
     weights = np.array([2.0] + [0] * (10 - 1), dtype=np.float32)
     bias = np.array([0.5], dtype=np.float32)
     y = X @ weights + bias
 
     # Convert the pattern to labels between 0 and 1.
     y = (y > y.mean()).astype(np.float32)
-    y = y.reshape(-1, 1)  # Ensure target is of shape (size, 1)
+    y = y.reshape(-1, 1)
 
     return X, y
 
@@ -86,15 +84,12 @@ def evaluate(device, loader, model, criterion):
 def main():
     world_size, rank = setup_distributed()
 
-    # Setting up the device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Rank {rank}: Training on device: {device}")
 
-    # Generating synthetic training and validation data
     X_train, y_train = generate_synthetic_data(2000)
     X_val, y_val = generate_synthetic_data(400)
 
-    # Create DataLoader instances
     batch_size = 32
     train_loader = DataLoader(
         TensorDataset(torch.from_numpy(X_train), torch.from_numpy(y_train)),
@@ -107,7 +102,6 @@ def main():
         shuffle=False,
     )
 
-    # Initialize model, criterion, and optimizer
     model = Net().to(device)
     if SAGEMAKER_DISTRIBUTED:
         model = DDP(
@@ -120,13 +114,12 @@ def main():
     for epoch in range(epochs):
         train_loss = train(device, train_loader, model, criterion, optimizer)
         val_loss, val_accuracy = evaluate(device, val_loader, model, criterion)
-        if rank == 0:  # Only print from the main process
+        if rank == 0:
             print(
                 f"Epoch: {epoch + 1}/{epochs}, Training Loss: {train_loss:.4f}, "
                 f"Validation Loss: {val_loss:.4f}, Validation Accuracy: {val_accuracy:.4f}"
             )
 
-    # Save the trained model
     if rank == 0:  # Only save from the main process
         model_dir = os.environ.get("SM_MODEL_DIR", ".")
         model_path = os.path.join(model_dir, "model.pth")
