@@ -1,17 +1,13 @@
-# MosaicML imports
 from composer import Trainer
 from composer.models import HuggingFaceModel
-from composer.loggers import MLFlowLogger
 
 import mlflow
 import torch
 
-# Hugging face imports
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 import os
 
-# Personal imports
 from inference import inference
 from preprocess import load_and_preprocess_data
 
@@ -33,7 +29,6 @@ print(f"Using device: {device}")
 
 
 with mlflow.start_run():
-    # Define our hf model and use composer to wrap it
     model_name = "distilbert-base-uncased"
     hf_model = AutoModelForSequenceClassification.from_pretrained(
         model_name, num_labels=2
@@ -43,10 +38,9 @@ with mlflow.start_run():
 
     mlflow.log_param("device", device)
     mlflow.log_param("model_name", model_name)
-    # Load and preprocess data
+
     train_loader, val_loader, test_loader = load_and_preprocess_data(tokenizer)
 
-    # Before we train our model, let's test how good it is at the task
     sarcasm_probability = inference(
         model=model,
         tokenizer=tokenizer,
@@ -54,7 +48,6 @@ with mlflow.start_run():
     )
     print(f"Sarcasm probability: {sarcasm_probability:.2f}%")
 
-    # Set a tag that we can use to remind ourselves what this run was for
     mlflow.set_tag(
         "Training Info",
         """Fine tuning job on distilbert for news
@@ -62,7 +55,6 @@ with mlflow.start_run():
     )
     mlflow.log_metric("initial_accuracy", sarcasm_probability)
 
-    # Set up the trainer
     trainer = Trainer(
         model=model,
         train_dataloader=train_loader,
@@ -70,10 +62,8 @@ with mlflow.start_run():
         max_duration="1ep",
     )
 
-    # Train the model
     trainer.fit()
 
-    # After training, test again
     sarcasm_probability = inference(
         model=model,
         tokenizer=tokenizer,

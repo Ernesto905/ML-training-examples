@@ -48,7 +48,6 @@ class Net(nn.Module):
         return x
 
 
-
 def check_mnist_files(root_dir: Path) -> bool:
     """
     Check for the presence of MNIST dataset files in the specified directory.
@@ -106,14 +105,12 @@ def train_test_dataloaders() -> Tuple[DataLoader, DataLoader]:
         Tuple[DataLoader, DataLoader]: Train and test dataloaders
     """
 
-    # Use sagemaker env var to find our data in
     sagemaker_data_root_path = os.environ.get("SM_CHANNEL_TRAINING")
     data_path = Path(sagemaker_data_root_path)
 
     print(f"MNIST found: {check_mnist_files(data_path)}")
 
     try:
-
         training_data = torchvision.datasets.MNIST(
             root=data_path, transform=ToTensor(), train=True, download=False
         )
@@ -164,7 +161,7 @@ def train(
             optimizer.step()
             if batch_idx % 20 == 0:
                 print(
-                    f"Train epoch: {epoch} [{batch_idx * len(data)} / {len(train_dataloader.dataset)} ({100. * batch_idx / len(train_dataloader):.0f}%)]\t{loss.item():.6f}"
+                    f"Train epoch: {epoch} [{batch_idx * len(data)} / {len(train_dataloader.dataset)} ({100.0 * batch_idx / len(train_dataloader):.0f}%)]\t{loss.item():.6f}"
                 )
                 mlflow.log_metric(
                     "train_loss",
@@ -225,7 +222,6 @@ def main() -> None:
     Main function to run the training and testing process.
     """
     try:
-
         # Also available
         # mlflow.pytorch.autolog()
 
